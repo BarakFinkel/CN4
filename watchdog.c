@@ -82,7 +82,7 @@ int main(int argnum, char *argt[])
         
         memset(buffer, 0, 128);
 
-        int recvResult = recv(clientSock, buffer, 6, 0);   // Receiving the client's request.
+        int recvResult = recv(clientSock, buffer, 6, 0);   // Receiving the better_ping request.
 
         if (recvResult < 0) 
         {
@@ -91,12 +91,12 @@ int main(int argnum, char *argt[])
         }         
         else if (recvResult == 0) 
         {
-            printf("Error : Client's socket is closed, nothing to receive.\n");   // If receiving failed, print an error and exit main.
+            printf("Error : better_ping is closed, nothing to receive.\n");   // If receiving failed, print an error and exit main.
             return -1;
         }
         else if (recvResult != 6)
         {
-            printf("Error: Server received a corrupted buffer.\n");
+            printf("Error: Watchdog received a corrupted buffer.\n");
             return -1;
         }
 
@@ -120,7 +120,7 @@ int main(int argnum, char *argt[])
                 time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
 
                 temp = recv(clientSock, buffer, 10, 0);       // Receiving the client's request to continue.
-
+                // check errors on recv()
                 if (temp < 0) 
                 {
                     printf("Error : Receiving failed.\n");    // If receiving failed, print an error and exit main.
@@ -130,41 +130,44 @@ int main(int argnum, char *argt[])
                 }
                 else if (temp == 0) 
                 {
-                    printf("Error : Client's socket is closed, nothing to receive.\n");   // If receiving failed, print an error and exit main.
+                    printf("Error : better_ping is closed, nothing to receive.\n");   // If receiving failed, print an error and exit main.
                     close(clientSock);
                     close(listenSock);
                     return -1;
                 }
                 else if (temp != 10)
                 {
-                    printf("Error: Server received a corrupted buffer.\n");
+                    printf("Error: watchdog received a corrupted buffer.\n");
                     close(clientSock);
                     close(listenSock);
                     return -1;
                 }
-
+                
+                // better_ping got a reply. reset timeout clock
                 else if ( strcmp(buffer, "got reply") == 0 )
                 {
                     memset(buffer, 0, 10);
                     break;
                 }
-
+                // better_ping didn't dot respond yet. answer him if to continue or to stop if time is up
                 else if ( strcmp(buffer, "continue?") == 0)
                 {
                     memset(buffer,0,10);
-
+                
+                    // time is up. send no to watchdog inorder to stop program
                     if( time >= 10 )
                     {
                         strcpy(buffer, "no!");
                     }
-
+                    // there is more time - send yes to watchdog inorder to continue 
                     else
                     {
                         strcpy(buffer, "yes");
                     }
                 
-                    temp = send(clientSock, buffer, strlen(buffer) + 1, 0);
-
+                    temp = send(clientSock, buffer, strlen(buffer) + 1, 0); // send the answer
+                    
+                    // check errors on send()
                     if (temp < 0) 
                     {
                         printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
@@ -174,7 +177,7 @@ int main(int argnum, char *argt[])
                     } 
                     else if (temp == 0) 
                     {
-                        printf("Error : Client's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
+                        printf("Error : better_ping is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
                         close(clientSock);
                         close(listenSock);
                         return -1;
@@ -186,7 +189,8 @@ int main(int argnum, char *argt[])
                         close(listenSock);
                         return -1;
                     } 
-
+                    
+                    // time is up. close sockets and stop the program 
                     else if ( strcmp(buffer, "no!") == 0 )
                     { 
                         close(clientSock);
@@ -198,7 +202,7 @@ int main(int argnum, char *argt[])
 
                 else 
                 {
-                    printf("Server received an invalid request, closing socket.\n");
+                    printf("watchdog received an invalid request, closing socket.\n");
                     close(clientSock);
                     close(listenSock);
                     return -1;
