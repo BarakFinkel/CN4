@@ -66,7 +66,7 @@ int main(int argnum, char *argt[])
     int rawsock = -1;
     if ((rawsock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
     {
-        fprintf(stderr, "socket() failed with error: %d", errno);
+        fprintf(stderr, "socket() failed with error: %d\n", errno);
         fprintf(stderr, "To create a raw socket, the process needs to be run by Admin/root user.\n");
         return -1;
     }
@@ -144,10 +144,13 @@ int main(int argnum, char *argt[])
         {
             printf("Error: Connecting to Watchdog failed.\n");   
             close(sock);
+            close(rawsock);
             return -1;
         }
 
-        printf("Connected to Watchdog!\n");         // if we past until here it means that we succussfully connected to watchdog
+        // if we passed until here it means that we succussfully connected to watchdog
+
+        printf("Pinging the address: %s\n", ip);
 
         char buffer[buffer_size] = {0};             // initialize a buffer for holding messages to watchdog 
         
@@ -170,22 +173,25 @@ int main(int argnum, char *argt[])
             {
                 printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
                 close(sock);
+                close(rawsock);
                 return -1;
             } 
             else if (temp == 0) 
             {
                 printf("Error : Client's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
                 close(sock);
+                close(rawsock);
                 return -1;
             }
             else if (temp != strlen(buffer) + 1)
             {
                 printf("Error: client received a corrupted buffer.\n");
                 close(sock);
+                close(rawsock);
                 return -1;
             }
             
-            memset(buffer, 0, strlen(buffer) + 1);                      // set the buffer. 
+            memset(buffer, 0, strlen(buffer) + 1);                      // reset the buffer. 
 
             gettimeofday(&start, 0);                                    // start mesuring the times it takes to send a ping and receive the 'pong' message
 
@@ -198,6 +204,8 @@ int main(int argnum, char *argt[])
             if (temp == -1) // check error on send()
             {
                 printf("Sending packet failed with error: %d\n", errno);
+                close(sock);
+                close(rawsock);
                 return -1;
             }
 
@@ -207,8 +215,7 @@ int main(int argnum, char *argt[])
 
             socklen_t addlen = sizeof(address);    
 
-            
-            //  We now begin a receiving loop, for getting the 'pong' message for our 'ping'.
+            // We now begin a receiving loop, for getting the reply message for our 'ping'.
             // we are recv with a non-blocking socket, for enabling the communication with the watchdog
             // so the watch dog will be able to notify us if the timeout clock ran out.(10 seconds)
 
@@ -240,14 +247,14 @@ int main(int argnum, char *argt[])
                     } 
                     else if (temp == 0) 
                     {
-                        printf("Error : Client's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
+                        printf("Error : Watchdog's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
                         close(sock);
                         close(rawsock);
                         return -1;
                     }
                     else if (temp != strlen(buffer) + 1)
                     {
-                        printf("Error: client received a corrupted buffer.\n");
+                        printf("Error: Watchdog received a corrupted buffer.\n");
                         close(sock);
                         close(rawsock);
                         return -1;
@@ -274,20 +281,20 @@ int main(int argnum, char *argt[])
                     } 
                     else if (temp == 0) 
                     {
-                        printf("Error : Client's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
+                        printf("Error : Watchdog's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
                         close(sock);
                         close(rawsock);
                         return -1;
                     }
                     else if (temp != strlen(buffer) + 1)
                     {
-                        printf("Error: client received a corrupted buffer.\n");
+                        printf("Error: Watchdog received a corrupted buffer.\n");
                         close(sock);
                         close(rawsock);
                         return -1;
                     }
 
-                    memset(buffer,0,10); // set the buffer 
+                    memset(buffer,0,10); // reset the buffer 
 
                     temp = recv(sock, buffer, 4, 0); // recv answer from watchdog whether to continue
                    
@@ -301,14 +308,14 @@ int main(int argnum, char *argt[])
                     } 
                     else if (temp == 0) 
                     {
-                        printf("Error : Client's socket is closed, nowhere to send to.\n");   // If receiving failed, print an error and exit main.
+                        printf("Error : Watchdog's socket is closed, nowhere to receive from.\n");   // If receiving failed, print an error and exit main.
                         close(sock);
                         close(rawsock);
                         return -1;
                     }
                     else if (temp != 4)
                     {
-                        printf("Error: client received a corrupted buffer.\n");
+                        printf("Error: Received a corrupted buffer.\n");
                         close(sock);
                         close(rawsock);
                         return -1;
@@ -334,7 +341,7 @@ int main(int argnum, char *argt[])
                     // there is an invalid response - quit 
                     else 
                     {
-                        printf("Invalid response from server, closing socket.");
+                        printf("Invalid response from Watchdog, closing socket.\n");
                         close(sock);
                         close(rawsock);
                         return -1;
