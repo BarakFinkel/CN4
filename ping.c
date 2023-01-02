@@ -59,7 +59,7 @@ int main(int argnum, char *argt[])
     int rawsock = -1;;
     if ((rawsock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
     {
-        fprintf(stderr, "socket() failed with error: %d", errno);
+        fprintf(stderr, "socket() failed with error: %d\n", errno);
         fprintf(stderr, "To create a raw socket, the process needs to be run by Admin/root user.\n\n");
         return -1;
     }
