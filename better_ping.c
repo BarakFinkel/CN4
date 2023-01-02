@@ -98,8 +98,8 @@ int main(int argnum, char *argt[])
     // We now create a fork process which will execute the watchdog program:
     // If there is an error creating the child process or executing the watchdog program, we print an error message and exit the program.
 
-    int child = fork();
-    if (child == 0)
+    int child = fork();                 // create the child process 
+    if (child == 0)     // child process will  execute the watchdog 
     {
         exec = execv(wdarg[0], wdarg);
             
@@ -112,7 +112,7 @@ int main(int argnum, char *argt[])
 
     // If the watchdog program was executed successfully, we continue to send the ICMP packet to the destination.
 
-    else
+    else            //  continue from here with the parent process 
     {
         sleep(1);                                               // We use a sleep() method to let Watchdog get to the neccessary stage in order to proceed.
 
@@ -147,9 +147,9 @@ int main(int argnum, char *argt[])
             return -1;
         }
 
-        printf("Connected to Watchdog!\n");
+        printf("Connected to Watchdog!\n");         // if we past until here it means that we succussfully connected to watchdog
 
-        char buffer[buffer_size] = {0};
+        char buffer[buffer_size] = {0};             // initialize a buffer for holding messages to watchdog 
         
         // For each packet sent, we track the time of sending it and getting a reply from the destination.
         // We use the gettimeofday() function to get the time in seconds and microseconds.
@@ -158,12 +158,14 @@ int main(int argnum, char *argt[])
 
         while(1)
         {
-            sleep(1);
+            sleep(1);                                                       // sleep in order to enable more convenient printing
             
-            strcpy(buffer,"start");
-
+            strcpy(buffer,"start");                                 // message for watchdog
+            
+           //  send Watchdog to start mesuring the timeout clock
             temp = send(sock, buffer, strlen(buffer) + 1, 0);
-
+           
+            // checking possible errors of send()
             if (temp < 0) 
             {
                 printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
@@ -183,16 +185,17 @@ int main(int argnum, char *argt[])
                 return -1;
             }
             
-            memset(buffer, 0, strlen(buffer) + 1);
+            memset(buffer, 0, strlen(buffer) + 1);                      // set the buffer. 
 
-            gettimeofday(&start, 0);
+            gettimeofday(&start, 0);                                    // start mesuring the times it takes to send a ping and receive the 'pong' message
 
             // We use the sendto() function to send the packet to the destination.
             
-            int len = makePacket(pac);
+            int len = makePacket(pac);                                  // make the packet header. len indicates on the length of the header
 
-            int temp = sendto(rawsock, pac, len, 0, (struct sockaddr *)&address, sizeof(address));
-            if (temp == -1)
+            int temp = sendto(rawsock, pac, len, 0, (struct sockaddr *)&address, sizeof(address));              // send the 'ping' message to distination 
+            
+            if (temp == -1) // check error on send()
             {
                 printf("Sending packet failed with error: %d\n", errno);
                 return -1;
@@ -204,17 +207,20 @@ int main(int argnum, char *argt[])
 
             socklen_t addlen = sizeof(address);    
 
-            // We now begin a receiving loop, which will only break when we get a reply from the destination.
-            // The continuation rule is: As long as we can receive packets, we will continue to do so.
+            
+            //  We now begin a receiving loop, for getting the 'pong' message for our 'ping'.
+            // we are recv with a non-blocking socket, for enabling the communication with the watchdog
+            // so the watch dog will be able to notify us if the timeout clock ran out.(10 seconds)
 
-            ssize_t rec = -1;
+            ssize_t rec = -1; 
 
             while (1)  
             {
+              
+                rec = recvfrom(rawsock, pac, sizeof(pac), 0, (struct sockaddr *)&address, &addlen);   // receive 'pong' on non-blocking socket    
                 
-                rec = recvfrom(rawsock, pac, sizeof(pac), 0, (struct sockaddr *)&address, &addlen);
-
-                if (rec > 0)
+                // in case we got the message 
+                if (rec > 0)                           
                 {   
                     // We now get the end time of receiving the reply from the destination, and calculate the time it took to get the reply.
 
@@ -222,8 +228,9 @@ int main(int argnum, char *argt[])
                     
                     strcpy(buffer, "got reply");
 
-                    temp = send(sock, buffer, strlen(buffer) + 1, 0);
-
+                    temp = send(sock, buffer, strlen(buffer) + 1, 0); // notify the watchdog that we got the message, so he can reset the timeout clock
+                    
+                    //  checking errors of send() 
                     if (temp < 0) 
                     {
                         printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
@@ -245,16 +252,19 @@ int main(int argnum, char *argt[])
                         close(rawsock);
                         return -1;
                     }
-
+                    
+                    // no errors on sending - break and send another ping message
+                    
                     break;     // If we got a reply, we break the loop.
                 }
-                
+                // we didn't got the message yet. check with watch if time ran out
                 else
                 {
-                    strcpy(buffer, "continue?");
+                    strcpy(buffer, "continue?");            // send watch dog a message asking if to continue receiving? 
                     
                     temp = send(sock, buffer, strlen(buffer) + 1, 0);
-
+                    
+                    //  check errors of send()
                     if (temp < 0) 
                     {
                         printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
@@ -277,10 +287,11 @@ int main(int argnum, char *argt[])
                         return -1;
                     }
 
-                    memset(buffer,0,10);
+                    memset(buffer,0,10); // set the buffer 
 
-                    temp = recv(sock, buffer, 4, 0);
-
+                    temp = recv(sock, buffer, 4, 0); // recv answer from watchdog whether to continue
+                   
+                    // check errors on recv() 
                     if (temp < 0) 
                     {
                         printf("Error : Sending failed.\n");    // If receiving failed, print an error and exit main.
@@ -303,6 +314,8 @@ int main(int argnum, char *argt[])
                         return -1;
                     }
 
+                     
+                    // if the answer is no - close socket and quit program 
                     else if ( strcmp (buffer, "no!") == 0 ) 
                     {
                         printf("Time out! Closing socket.\n");
@@ -310,12 +323,15 @@ int main(int argnum, char *argt[])
                         close(rawsock);
                         return -1;                        
                     }
-
+                    
+                    
+                    // if answer is yes - continue 
                     else if ( strcmp (buffer, "yes") == 0 ) 
                     {
                         continue;
                     }
                     
+                    // there is an invalid response - quit 
                     else 
                     {
                         printf("Invalid response from server, closing socket.");
@@ -327,7 +343,9 @@ int main(int argnum, char *argt[])
                     memset(buffer,0,4);
                 }
             }
-
+            
+            // calculate the time of sending and receiving the ping message 
+            
             float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
             unsigned long microseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec);
             time = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
